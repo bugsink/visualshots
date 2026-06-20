@@ -8,6 +8,12 @@ It captures a named scenario twice:
 * `after`: the branch tip.
 
 The output is a small review bundle in `results/<scenario>/` containing screenshots, metadata, and an HTML page.
+Each captured ref is written in light and dark mode:
+
+* `before.png`
+* `before-dark.png`
+* `after.png`
+* `after-dark.png`
 
 ## Usage
 

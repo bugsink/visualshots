@@ -39,6 +39,7 @@ class CaptureResult:
     ref: str
     resolved_ref: str | None
     image: str | None
+    dark_image: str | None
     error: str | None = None
 
 
@@ -247,7 +248,7 @@ def run_setup(scenario, worktree, env, run_dir):
         return json.load(f)
 
 
-def capture_browser(scenario, context, output_path, browser_name):
+def capture_browser(scenario, context, output_path, browser_name, color_scheme):
     try:
         from playwright.sync_api import sync_playwright
     except ImportError as exc:
@@ -257,10 +258,11 @@ def capture_browser(scenario, context, output_path, browser_name):
     with sync_playwright() as playwright:
         browser_type = getattr(playwright, browser_name)
         browser = browser_type.launch()
-        page = browser.new_page(viewport=scenario.viewport)
+        page = browser.new_page(viewport=scenario.viewport, color_scheme=color_scheme)
         try:
             result = module.capture(page, context) or {}
             selector = result.get("selector") or context.get("selector") or "body"
+            page.evaluate("theme => document.documentElement.setAttribute('data-theme', theme)", color_scheme)
             page.locator(selector).screenshot(path=str(output_path))
         finally:
             browser.close()
@@ -271,6 +273,7 @@ def capture_ref(repo, scenario, ref, label, output_dir, tmp_root, build_tailwind
     run_dir = tmp_root / ("run-" + label)
     run_dir.mkdir()
     image_path = output_dir / ("%s.png" % label)
+    dark_image_path = output_dir / ("%s-dark.png" % label)
 
     try:
         resolved_ref = resolve_ref(repo, ref)
@@ -287,17 +290,18 @@ def capture_ref(repo, scenario, ref, label, output_dir, tmp_root, build_tailwind
 
             process, log_file, log_path = start_server(worktree, env, port, run_dir)
             try:
-                capture_browser(scenario, context, image_path, env["VISUALSHOTS_BROWSER"])
+                capture_browser(scenario, context, image_path, env["VISUALSHOTS_BROWSER"], "light")
+                capture_browser(scenario, context, dark_image_path, env["VISUALSHOTS_BROWSER"], "dark")
             except Exception as exc:
                 raise VisualshotsError("%s\nDjango log:\n%s" % (exc, read_log(log_path))) from exc
             finally:
                 stop_server(process, log_file)
 
-        return CaptureResult(label, "ok", ref, resolved_ref, image_path.name)
+        return CaptureResult(label, "ok", ref, resolved_ref, image_path.name, dark_image_path.name)
 
     except Exception as exc:
         if allow_unavailable:
-            return CaptureResult(label, "unavailable", ref, None, None, str(exc))
+            return CaptureResult(label, "unavailable", ref, None, None, None, str(exc))
         raise
 
 
@@ -324,13 +328,14 @@ def write_index(output_dir, metadata):
     before = metadata["captures"]["before"]
     after = metadata["captures"]["after"]
 
-    before_html = "<p>Before unavailable.</p>"
-    if before and before["status"] == "ok":
-        before_html = '<img src="%s" alt="Before screenshot">' % escape(before["image"])
-    elif before and before["error"]:
-        before_html = "<pre>%s</pre>" % escape(before["error"])
-
-    after_html = '<img src="%s" alt="After screenshot">' % escape(after["image"])
+    def capture_html(capture, image_key, alt_text, unavailable_text):
+        if not capture:
+            return "<p>%s</p>" % escape(unavailable_text)
+        if capture["status"] == "ok" and capture.get(image_key):
+            return '<img src="%s" alt="%s">' % (escape(capture[image_key]), escape(alt_text))
+        if capture["error"]:
+            return "<pre>%s</pre>" % escape(capture["error"])
+        return "<p>%s</p>" % escape(unavailable_text)
 
     html = """<!doctype html>
 <html>
@@ -351,14 +356,24 @@ def write_index(output_dir, metadata):
   <p>Viewport: <code>{viewport}</code></p>
   <div class="grid">
     <section>
-      <h2>Before</h2>
+      <h2>Before Light</h2>
       <p><code>{before_ref}</code></p>
-      {before_html}
+      {before_light_html}
     </section>
     <section>
-      <h2>After</h2>
+      <h2>After Light</h2>
       <p><code>{after_ref}</code></p>
-      {after_html}
+      {after_light_html}
+    </section>
+    <section>
+      <h2>Before Dark</h2>
+      <p><code>{before_ref}</code></p>
+      {before_dark_html}
+    </section>
+    <section>
+      <h2>After Dark</h2>
+      <p><code>{after_ref}</code></p>
+      {after_dark_html}
     </section>
   </div>
 </body>
@@ -369,8 +384,10 @@ def write_index(output_dir, metadata):
         viewport=escape(json.dumps(scenario["viewport"])),
         before_ref=escape(before["resolved_ref"] if before and before["resolved_ref"] else "unavailable"),
         after_ref=escape(after["resolved_ref"]),
-        before_html=before_html,
-        after_html=after_html,
+        before_light_html=capture_html(before, "image", "Before light screenshot", "Before light unavailable."),
+        after_light_html=capture_html(after, "image", "After light screenshot", "After light unavailable."),
+        before_dark_html=capture_html(before, "dark_image", "Before dark screenshot", "Before dark unavailable."),
+        after_dark_html=capture_html(after, "dark_image", "After dark screenshot", "After dark unavailable."),
     )
     (output_dir / "index.html").write_text(html)
 
