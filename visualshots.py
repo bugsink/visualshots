@@ -150,7 +150,8 @@ def write_settings(run_dir, port):
             "DATABASES['default']['TEST']['NAME'] = str(RUN_DIR / 'test.sqlite3')",
             "DATABASES['snappea']['NAME'] = str(RUN_DIR / 'snappea.sqlite3')",
             "BUGSINK['BASE_URL'] = 'http://127.0.0.1:%d'" % port,
-            "ALLOWED_HOSTS = ['127.0.0.1', 'localhost']",
+            "SNAPPEA['TASK_ALWAYS_EAGER'] = True",
+            "ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']",
             "CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:%d']" % port,
             "EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'",
             "",
@@ -172,7 +173,9 @@ def python_env(worktree, run_dir, port):
         "PYTHONPATH": os.pathsep.join(pythonpath),
         "VISUALSHOTS_BASE_URL": "http://127.0.0.1:%d" % port,
         "VISUALSHOTS_RUN_DIR": str(run_dir),
+        "VISUALSHOTS_REPO": str(worktree),
     })
+    env.setdefault("SAMPLES_DIR", str(worktree.parent / "event-samples"))
     return env
 
 

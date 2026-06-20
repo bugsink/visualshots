@@ -19,11 +19,13 @@ Each captured ref is written in light and dark mode:
 
 ```bash
 python visualshots.py list
-python visualshots.py run --repo /path/to/bugsink --scenario smoke-projects --after HEAD
-python visualshots.py run --repo /path/to/bugsink --scenario smoke-projects,smoke-issue --after HEAD
+python visualshots.py run --repo /path/to/bugsink --scenario projects --after HEAD
+python visualshots.py run --repo /path/to/bugsink --scenario issue-stacktrace,issue-details --after HEAD
 ```
 
 The tool creates temporary git worktrees and isolated SQLite databases. It does not modify the current checkout.
+Scenarios that use sample events read `SAMPLES_DIR`, defaulting to an `event-samples` checkout next to the Bugsink
+worktree.
 
 Use the Playwright Python image when running this in Docker:
 
