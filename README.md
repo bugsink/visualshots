@@ -26,6 +26,7 @@ python visualshots.py run --repo /path/to/bugsink --scenario issue-stacktrace,is
 The tool creates temporary git worktrees and isolated SQLite databases. It does not modify the current checkout.
 Scenarios that use sample events read `SAMPLES_DIR`, defaulting to an `event-samples` checkout next to the Bugsink
 worktree.
+Scenario setup runs Bugsink with strict event validation, so ingested samples must be schema-valid.
 
 Use the Playwright Python image when running this in Docker:
 

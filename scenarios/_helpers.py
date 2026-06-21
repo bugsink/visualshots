@@ -157,8 +157,6 @@ def setup_environment():
     for index, sample_name in enumerate([
         "bugsink/contexts.json",
         "bugsink/exception-group.json",
-        "bugsink/top-level-message.json",
-        "bugsink/top-level-message-as-str.json",
         "sentry/javascript-exception-fallback-to-message-whistles.json",
     ], start=1):
         sample = load_sample(sample_name)

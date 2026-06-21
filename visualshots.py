@@ -150,6 +150,7 @@ def write_settings(run_dir, port):
             "DATABASES['default']['TEST']['NAME'] = str(RUN_DIR / 'test.sqlite3')",
             "DATABASES['snappea']['NAME'] = str(RUN_DIR / 'snappea.sqlite3')",
             "BUGSINK['BASE_URL'] = 'http://127.0.0.1:%d'" % port,
+            "BUGSINK['VALIDATE_ON_DIGEST'] = 'strict'",
             "SNAPPEA['TASK_ALWAYS_EAGER'] = True",
             "ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']",
             "CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:%d']" % port,
