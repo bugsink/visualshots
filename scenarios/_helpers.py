@@ -105,7 +105,7 @@ def setup_environment():
     from django.contrib.auth import get_user_model
 
     from bsmain.models import AuthToken
-    from events.models import Event, IssueEventCountsPerHour
+    from events.models import Event, IssueEventCountsPerHour, ProjectEventCountsPerHour
     from projects.models import Project, ProjectMembership, ProjectRole, ProjectVisibility
     from teams.models import Team, TeamMembership, TeamRole
 
@@ -171,11 +171,13 @@ def setup_environment():
         issue.digested_event_count = max(len(events), 9)
         issue.save(update_fields=["stored_event_count", "digested_event_count"])
         seed_issue_sparkline(IssueEventCountsPerHour, project, issue, events)
+        seed_issue_list_sparkline(IssueEventCountsPerHour, project, issue, events)
 
     project.issue_count = project.issue_set.filter(is_deleted=False).count()
     project.stored_event_count = Event.objects.filter(project=project).count()
     project.digested_event_count = max(project.stored_event_count, 37)
     project.save(update_fields=["issue_count", "stored_event_count", "digested_event_count"])
+    seed_project_list_sparkline(ProjectEventCountsPerHour, project)
 
     return {
         "username": USERNAME,
@@ -241,3 +243,49 @@ def seed_issue_sparkline(bucket_model, project, issue, events):
                 "digest_order": last_digest_order,
             },
         )
+
+
+def seed_issue_list_sparkline(bucket_model, project, issue, events):
+    from django.utils import timezone
+
+    from events.usage import hour_bucket
+
+    if not events:
+        return
+
+    current_hour = hour_bucket(timezone.now())
+    last_digest_order = events[-1].digest_order
+    pattern = [1, 3, 2, 8, 4, 2, 12, 3, 5, 1, 7, 2, 4, 1, 10, 5, 3, 2, 6, 1, 4, 2, 9, 13]
+
+    for age in range(24):
+        count = pattern[age]
+
+        bucket_model.objects.update_or_create(
+            project=project,
+            issue=issue,
+            bucket=current_hour - timedelta(hours=age),
+            defaults={
+                "count": count,
+                "digest_order": last_digest_order,
+            },
+        )
+
+
+def seed_project_list_sparkline(bucket_model, project):
+    from django.db.models import Sum
+    from django.utils import timezone
+
+    from events.models import IssueEventCountsPerHour
+    from events.usage import hour_bucket
+
+    current_hour = hour_bucket(timezone.now())
+    for age in range(24):
+        bucket = current_hour - timedelta(hours=age)
+        count = IssueEventCountsPerHour.objects.filter(project=project, bucket=bucket).aggregate(
+            count=Sum("count"))["count"]
+        if count:
+            bucket_model.objects.update_or_create(
+                project=project,
+                bucket=bucket,
+                defaults={"count": count},
+            )
